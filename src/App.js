@@ -10,6 +10,8 @@ function App() {
   const colorInstance = useRef();
   const inputTokenRef = useRef();
   const collectionRef = useRef();
+  const transferIdRef = useRef();
+  const transferToRef = useRef();
 
   useEffect(()=>{
     try {
@@ -33,7 +35,11 @@ function App() {
 
   async function contractEventListener(){
     colorInstance.current.events.Transfer().on("data", (result)=>{
-      alert(`The new NFT tokenID: \n${result.returnValues.tokenId}`)
+      if (result.returnValues.to === accounts.current[0]){
+        alert(`The new NFT tokenID: \n${result.returnValues.tokenId}`)
+      } else if(result.returnValues.from === accounts.current[0]){
+        alert(`Your NFT tokenID: \n${result.returnValues.tokenId} has been successfully sent to\n${result.returnValues.to}`)
+      }      
     })
   }
 
@@ -44,30 +50,39 @@ function App() {
     inputTokenRef.current.value = ""
   }
 
-  function appendNewComponent(parent, content){
+  function appendNewComponent(parent, colorCode ,content){
     let colorDiv = document.createElement("div")
     let textDiv = document.createElement("div")
     textDiv.innerHTML = content
     textDiv.style.cssText = "text-align: center; padding-top: 40px"
-    colorDiv.style.cssText = `background-color: ${content}; border-radius: 50px; width: 100px; height: 100px; text-align: center; display: inline-block; border: solid 3px grey`
+    colorDiv.style.cssText = `background-color: ${colorCode}; border-radius: 50px; width: 100px; height: 100px; text-align: center; display: inline-block; border: solid 3px grey`
     colorDiv.appendChild(textDiv)
     parent.current.appendChild(colorDiv)
   }
 
   async function handleCollection(evt) {
     const type = evt.target && evt.target.attributes.name.value
+    let _totalSupply = await colorInstance.current.methods.totalSupply().call()
     switch (type) {
       case "all":
         collectionRef.current.innerHTML = ""
-        let _totalSupply = await colorInstance.current.methods.totalSupply().call()
         for (var i = 0; i < _totalSupply; i++) {
           let _colorCode = await colorInstance.current.methods.colors(i).call()
-          await appendNewComponent(collectionRef, _colorCode)
+          let colorCodeId = i+1
+          await appendNewComponent(collectionRef, _colorCode ,`${_colorCode}<br>ID: ${colorCodeId}`)
         } 
         break;
 
       case "mine":
-        console.log("myCollection")
+        collectionRef.current.innerHTML = ""
+        // let _balance = await colorInstance.current.methods.balanceOf(accounts.current[0]).call()
+        for (var colorCodeId = 1; colorCodeId <= _totalSupply; colorCodeId++) {
+          let _colorCode = await colorInstance.current.methods.idToColor(colorCodeId).call()
+          let _owner = await colorInstance.current.methods.ownerOf(colorCodeId).call();
+          if (_owner === accounts.current[0]) {
+            await appendNewComponent(collectionRef, _colorCode, `${_colorCode}<br>ID: ${colorCodeId}`)
+          }
+        }        
         break;
 
       default:
@@ -76,6 +91,13 @@ function App() {
   }
 
 
+  async function handleTransfer() {
+    // TODO: filter id which is not exist
+    let tokenId = transferIdRef.current.value;
+    let transferTo = transferToRef.current.value;
+    // TODO: Add try catch to catch ERROR.
+    await colorInstance.current.methods.transfer(accounts.current[0], transferTo, tokenId).send({from: accounts.current[0]});
+  }
 
   return (
     <div className="App">
@@ -84,8 +106,13 @@ function App() {
       <input placeholder="color code. ex. #FFFFFF" ref={inputTokenRef}></input>
       <button onClick={handleIssueToken}>Mint</button>
       <div onClick={handleCollection} name="all">All NTFs</div>
+      <div onClick={handleCollection} name="mine">My collection</div>
+      <h2>Transfer your NFT asset</h2>
+      <span>Token ID:</span><input ref={transferIdRef}></input>
+      <span>Transfer to:</span><input ref={transferToRef}></input>
+      <button onClick={handleTransfer}>Submit</button>
       <hr></hr>
-      <div ref={collectionRef}></div>
+      <div ref={collectionRef}></div>    
     </div>
   );
 }

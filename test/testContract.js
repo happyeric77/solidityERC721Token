@@ -63,4 +63,12 @@ contract ("My contract test", accounts=>{
             expect(color).equal(expectedColors[i])
         }
     });
+
+    it("Is able to transfer token", async() => {
+        let balanceBefore = await colorInstance.balanceOf(accounts[0])
+        await colorInstance.transfer(accounts[0], accounts[1], 1)
+        let balanceAfter = await colorInstance.balanceOf(accounts[0])
+        expect(balanceAfter.toNumber()).equal(balanceBefore.toNumber()-1)
+        return expect(colorInstance.transfer(accounts[0], accounts[1], 2)).to.be.fulfilled;
+    })
 })
